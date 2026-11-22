@@ -4,7 +4,7 @@ version = "3.4.0"
 edition = "2024"
 default-run = "utter"
 license = "MIT"
-repository = "https://utter.example/source"
+repository = "https://github.com/Sudeepnt/Utter-Windows"
 
 # Crates imported from Scrawl live under `crates/`. Plain `cargo build` and
 # `cargo test` still select only Utter; pass `--workspace` or `-p` for the others.
@@ -42,6 +42,15 @@ debug = false
 # backtraces lose function names; debug builds keep them.
 [profile.release]
 strip = true
+
+# What the Windows workflow ships (`cargo build --profile dist`): the release
+# build with whole-program link-time optimization, which inlines across crates
+# and drops unused code, for a smaller and faster utter.exe. It builds slower,
+# so everyday `--release` builds keep the defaults.
+[profile.dist]
+inherits = "release"
+lto = "fat"
+codegen-units = 1
 
 # transcribe.cpp 0.4.1 plus one ggml patch that builds only the Vulkan
 # shaders Utter's models use (see `CMAKE_ARGS` in .cargo/config.toml),

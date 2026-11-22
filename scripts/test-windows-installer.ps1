@@ -1,9 +1,9 @@
 # Silently installs, reinstalls, installs over another version with, and
-# uninstalls a utter-setup-*.exe on a disposable Windows machine (CI), checking
+# uninstalls a UtterSetup-*.exe on a disposable Windows machine (CI), checking
 # the managed layout that src/updater/windows.rs expects at every step. It
 # uses the real %APPDATA%, so never run it on a machine with Utter installed.
 #
-#   scripts/test-windows-installer.ps1 -Installer dist\utter-setup-2.4.0-windows-x64.exe `
+#   scripts/test-windows-installer.ps1 -Installer dist\UtterSetup-x64.exe `
 #     -Executable dist\utter-2.4.0-windows-x64.exe -Console dist\utter-2.4.0-windows-x64.com -Version 2.4.0
 #
 # -Console (utter.com) is left out only for a release published before it.
@@ -23,7 +23,7 @@ $bin = Join-Path $support 'bin'
 $pointer = Join-Path $support 'current-version'
 $receipt = Join-Path $support 'install.json'
 $shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Utter.lnk'
-$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6ED48C92-5177-41F4-B8D6-37B7B02CFDF4}_is1'
+$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{167AB567-E9F8-4F9B-9F38-61C0C8A17F65}_is1'
 $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $logs = Join-Path $env:RUNNER_TEMP 'utter-installer-logs'
 New-Item -ItemType Directory -Force $logs | Out-Null

@@ -1,5 +1,5 @@
 ; Per-user Windows installer for Utter. It installs exactly the managed layout
-; that .github/release/install-windows.ps1 creates and src/windows_updater.rs updates:
+; that packaging/release/install-windows.ps1 runs and src/windows_updater.rs updates:
 ;
 ;   %APPDATA%\utter\versions\<version>\utter.exe
 ;   %APPDATA%\utter\versions\<version>\utter.com  (the console entry point)
@@ -42,14 +42,14 @@
 [Setup]
 ; Keep this AppId forever: it names the Apps & Features entry that
 ; src/windows_updater.rs keeps current after self-updates.
-AppId={{6ED48C92-5177-41F4-B8D6-37B7B02CFDF4}
+AppId={{167AB567-E9F8-4F9B-9F38-61C0C8A17F65}
 AppName=Utter
 AppVersion={#AppVersion}
 AppVerName=Utter {#AppVersion}
 AppPublisher=Utter
-AppPublisherURL=https://utter.example/
-AppSupportURL=https://utter.example/source/issues
-AppUpdatesURL=https://utter.example/source/releases
+AppPublisherURL=https://github.com/Sudeepnt/Utter-Windows
+AppSupportURL=https://github.com/Sudeepnt/Utter-Windows/issues
+AppUpdatesURL=https://github.com/Sudeepnt/Utter-Windows/releases
 PrivilegesRequired=lowest
 ArchitecturesAllowed={#AllowedArchitectures}
 ArchitecturesInstallIn64BitMode={#AllowedArchitectures}
@@ -64,10 +64,12 @@ UninstallDisplayName=Utter
 UninstallDisplayIcon={app}\uninstall\utter.ico
 SetupIconFile=..\..\resources\windows\utter.ico
 WizardStyle=modern
-Compression=lzma2/max
+; ultra64's 64 MB dictionary spans the whole of utter.exe, so the download is
+; as small as LZMA gets it; unpacking needs about 70 MB of memory.
+Compression=lzma2/ultra64
 SolidCompression=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=utter-setup-{#AppVersion}-windows-{#Arch}
+OutputBaseFilename=UtterSetup-{#Arch}
 CloseApplications=yes
 RestartApplications=no
 ; Adding or removing bin on PATH reaches new terminals without signing out.

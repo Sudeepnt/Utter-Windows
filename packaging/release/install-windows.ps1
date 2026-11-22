@@ -1,17 +1,14 @@
-# Install Utter as a managed, self-updating Windows application for the
-# current user, mirroring install-linux.sh: the app lands in
-# %APPDATA%\utter\versions\<version>\utter.exe with its console entry point
-# utter.com beside it, a Start Menu shortcut points at utter.exe, %APPDATA%\utter\bin
-# (a copy of utter.com) goes on PATH, install.json marks the install as direct,
-# and the app then keeps itself current from the Utter release service
-# (docs/plans/release-service.md).
+# Installs Utter for the current user from the newest GitHub release:
+# downloads UtterSetup-<x64|arm64>.exe, checks it against the release's
+# SHA256SUMS.txt, runs it silently, and opens Utter. The installer puts Utter
+# in %APPDATA%\utter, adds it to the Start menu and Settings > Apps, and puts
+# `utter` on PATH. No administrator rights are needed. Utter's first run
+# downloads a speech model.
 #
-# Trust: HTTPS to the release service, the manifest's size and SHA-256 for
-# the download, and the executable's Authenticode signature, which the app
-# checks again for every update.
+#   powershell -ExecutionPolicy Bypass -Command "iwr https://github.com/Sudeepnt/Utter-Windows/releases/latest/download/install-windows.ps1 -OutFile install-windows.ps1; ./install-windows.ps1"
 #
-# Usage:
-#   powershell -ExecutionPolicy Bypass -File install-windows.ps1
+# Uninstall (settings, history and speech models stay):
+#
 #   powershell -ExecutionPolicy Bypass -File install-windows.ps1 -Uninstall
 
 [CmdletBinding()]
@@ -20,189 +17,74 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 downloads many times slower while it draws progress.
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-$origin = if ($env:UTTER_RELEASE_BASE_URL) { $env:UTTER_RELEASE_BASE_URL.TrimEnd('/') } else { 'https://updates.utter.example' }
-if (-not $origin.StartsWith('https://')) { throw 'UTTER_RELEASE_BASE_URL must be an https:// URL.' }
-# UTTER_INSTALL_CHANNEL=dev installs the newest dev build and keeps the
-# install on the Dev update channel; =stable requires the stable release.
-# Unset, it installs stable, or the newest dev build while the release
-# service has no stable Utter release yet.
-$channel = $env:UTTER_INSTALL_CHANNEL
-if ($channel -and $channel -notin @('stable', 'dev')) { throw 'UTTER_INSTALL_CHANNEL must be stable or dev.' }
+$repo = if ($env:UTTER_REPO) { $env:UTTER_REPO } else { 'Sudeepnt/Utter-Windows' }
 $support = Join-Path $env:APPDATA 'utter'
-$versions = Join-Path $support 'versions'
-$pointer = Join-Path $support 'current-version'
-$receipt = Join-Path $support 'install.json'
-$bin = Join-Path $support 'bin'
-$shortcut = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Utter.lnk'
-$runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-$managedMark = 'Utter managed install'
-
-function Remove-ManagedShortcut {
-    if (Test-Path $shortcut) {
-        $shell = New-Object -ComObject WScript.Shell
-        $link = $shell.CreateShortcut($shortcut)
-        if ($link.Description -eq $managedMark) {
-            Remove-Item $shortcut -Force
-        }
-    }
-}
-
-# The user's PATH without (or with, once) bin, so a terminal runs `utter` as
-# utter.com, the console program that waits for utter.exe.
-function Set-BinOnPath([bool]$present) {
-    $environment = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment')
-    $current = [string]$environment.GetValue('Path', '', [Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
-    $entries = @($current -split ';' | Where-Object { $_ -and $_.TrimEnd('\') -ne $bin })
-    if ($present) { $entries += $bin }
-    $updated = $entries -join ';'
-    if ($updated -ne $current) {
-        $environment.SetValue('Path', $updated, [Microsoft.Win32.RegistryValueKind]::ExpandString)
-        # SetEnvironmentVariable broadcasts the change to running programs.
-        [Environment]::SetEnvironmentVariable('UtterPathRefresh', '1', 'User')
-        [Environment]::SetEnvironmentVariable('UtterPathRefresh', $null, 'User')
-    }
-    $environment.Close()
-}
+# The installer's AppId (packaging/windows/utter.iss).
+$uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{167AB567-E9F8-4F9B-9F38-61C0C8A17F65}_is1'
 
 if ($Uninstall) {
-    Remove-ManagedShortcut
-    Set-BinOnPath $false
-    if (Test-Path $bin) { Remove-Item $bin -Recurse -Force }
-    try { Remove-ItemProperty -Path $runKey -Name 'Utter' -ErrorAction Stop } catch {}
-    if (Test-Path $versions) { Remove-Item $versions -Recurse -Force }
-    if (Test-Path $pointer) { Remove-Item $pointer -Force }
-    if (Test-Path $receipt) { Remove-Item $receipt -Force }
-    Write-Output "Removed Utter. Logs and settings remain in $support."
+    $entry = Get-ItemProperty $uninstallKey -ErrorAction SilentlyContinue
+    if (-not $entry) {
+        Write-Output 'Utter is not installed.'
+        exit 0
+    }
+    $uninstaller = $entry.UninstallString -replace '"', ''
+    $process = Start-Process $uninstaller -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+    if ($process.ExitCode -ne 0) { throw "The uninstaller failed with exit code $($process.ExitCode)." }
+    Write-Output "Removed Utter. Settings and history remain in $support, speech models and logs in $(Join-Path $env:LOCALAPPDATA 'utter')."
     exit 0
 }
 
 # A 32-bit PowerShell on 64-bit Windows reports the real machine here.
 $machine = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
-$target = switch ($machine) {
-    'AMD64' { 'windows-x64' }
-    'ARM64' { 'windows-arm64' }
+$label = switch ($machine) {
+    'AMD64' { 'x64' }
+    'ARM64' { 'arm64' }
     default { throw "Utter supports 64-bit x64 and ARM64 Windows, not $machine." }
 }
-if (-not $channel) {
+
+$base = "https://github.com/$repo/releases/latest/download"
+$name = "UtterSetup-$label.exe"
+$temp = Join-Path ([IO.Path]::GetTempPath()) ("utter-install-" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory $temp | Out-Null
+try {
+    $sums = Join-Path $temp 'SHA256SUMS.txt'
+    $setup = Join-Path $temp $name
+    Write-Output "Downloading $name from github.com/$repo..."
     try {
-        $null = Invoke-WebRequest -Uri "$origin/utter/desktop/stable.json" -UseBasicParsing -TimeoutSec 30
-        $channel = 'stable'
+        Invoke-WebRequest -Uri "$base/SHA256SUMS.txt" -OutFile $sums -UseBasicParsing -TimeoutSec 60
+        Invoke-WebRequest -Uri "$base/$name" -OutFile $setup -UseBasicParsing -TimeoutSec 900
     } catch {
         if ($_.Exception.Response -and [int]$_.Exception.Response.StatusCode -eq 404) {
-            Write-Output 'Utter has no stable release yet; installing the newest dev build, which keeps updating from the Dev channel. Set UTTER_INSTALL_CHANNEL=stable to require the stable release.'
-            $channel = 'dev'
-        } else {
-            throw
+            throw "The newest Utter release has no $name. See https://github.com/$repo/releases."
         }
+        throw
     }
-}
-$manifestUrl = "$origin/utter/desktop/$channel.json"
-Write-Output "Fetching $manifestUrl..."
-$manifest = (Invoke-WebRequest -Uri $manifestUrl -UseBasicParsing -TimeoutSec 30).Content | ConvertFrom-Json
-if ($manifest.schema -ne 1) { throw "Unsupported manifest schema $($manifest.schema)." }
-if ($manifest.app -ne 'utter' -or $manifest.artifact -ne 'desktop' -or $manifest.channel -ne $channel) {
-    throw "The manifest is not Utter desktop on the $channel channel."
-}
-$version = $manifest.release.version
-# Display text that names a directory; versions are never compared.
-if ($version -notmatch '^[0-9A-Za-z][0-9A-Za-z.+_-]{0,127}$') { throw "Unexpected version $version." }
-$file = $manifest.release.targets.$target
-if (-not $file) { throw "Utter $version has no $target build." }
-function Resolve-Download($entry, [string]$name) {
-    if ($entry.sha256 -notmatch '^[0-9a-f]{64}$' -or $entry.size -le 0) { throw "The manifest's $name entry is invalid." }
-    $url = [Uri]::new([Uri]$manifestUrl, $entry.url).AbsoluteUri
-    if (-not $url.StartsWith("$origin/")) { throw "The manifest points outside $origin." }
-    $url
+
+    $line = Get-Content $sums | Where-Object { $_ -match "^[0-9a-f]{64}\s+\*?$([regex]::Escape($name))$" } | Select-Object -First 1
+    if (-not $line) { throw "SHA256SUMS.txt has no entry for $name." }
+    $expected = ($line -split '\s+')[0]
+    $actual = (Get-FileHash -Algorithm SHA256 $setup).Hash.ToLowerInvariant()
+    if ($actual -ne $expected) { throw "$name failed checksum verification." }
+
+    Write-Output 'Installing Utter...'
+    $process = Start-Process $setup -Wait -PassThru -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
+    if ($process.ExitCode -ne 0) { throw "The installer failed with exit code $($process.ExitCode)." }
+} finally {
+    Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# Moves <source> over <path>. A running program can't be replaced but can be
-# renamed, so one in the way moves aside to <path>.old, removed next time.
-function Replace-File([string]$source, [string]$path) {
-    $aside = "$path.old"
-    if (Test-Path $aside) { Remove-Item $aside -Force -ErrorAction SilentlyContinue }
-    try {
-        Move-Item $source $path -Force
-    } catch {
-        Move-Item $path $aside -Force
-        Move-Item $source $path -Force
-    }
-}
-
-# Downloads to <path>.partial, checks size and SHA-256 against the manifest,
-# then moves it into place.
-function Save-Download($entry, [string]$url, [string]$path) {
-    $partial = "$path.partial"
-    if (Test-Path $partial) { Remove-Item $partial -Force }
-    Invoke-WebRequest -Uri $url -OutFile $partial -UseBasicParsing -TimeoutSec 600
-    $bytes = (Get-Item $partial).Length
-    if ($bytes -ne $entry.size) {
-        Remove-Item $partial -Force
-        throw "The download has $bytes bytes, expected $($entry.size)."
-    }
-    $sha = (Get-FileHash -Algorithm SHA256 $partial).Hash.ToLowerInvariant()
-    if ($sha -ne $entry.sha256) {
-        Remove-Item $partial -Force
-        throw 'The download failed checksum verification.'
-    }
-    Replace-File $partial $path
-}
-
-$fileUrl = Resolve-Download $file $target
-# utter.com, from releases that have one.
-$consoleFile = $manifest.release.targets."$target-cli"
-$consoleUrl = if ($consoleFile) { Resolve-Download $consoleFile "$target-cli" }
-
-$versionDir = Join-Path $versions $version
-$executable = Join-Path $versionDir 'utter.exe'
-New-Item -ItemType Directory -Force $versionDir | Out-Null
-
-$console = Join-Path $versionDir 'utter.com'
-Write-Output "Downloading Utter $version..."
-Save-Download $file $fileUrl $executable
-if ($consoleUrl) { Save-Download $consoleFile $consoleUrl $console }
-# The version probe runs the staged files and removes them again on a
-# mismatch. utter.com waits for utter.exe, a GUI program PowerShell wouldn't.
-if ($consoleUrl) {
-    $reported = (& $console --version) -split '\s+' | Select-Object -Last 1
-} else {
-    $probe = Join-Path $versionDir 'version.txt'
-    Start-Process $executable -ArgumentList '--version' -Wait -NoNewWindow -RedirectStandardOutput $probe
-    $reported = (Get-Content $probe -Raw).Trim() -split '\s+' | Select-Object -Last 1
-    Remove-Item $probe -Force
-}
-if ($reported -ne $version) {
-    Remove-Item $executable -Force
-    if (Test-Path $console) { Remove-Item $console -Force }
-    throw "The downloaded Utter reports version $reported, expected $version."
-}
-
-$pointerPartial = Join-Path $support 'current-version.partial'
-Set-Content -Path $pointerPartial -Value $version -NoNewline
-Move-Item $pointerPartial $pointer -Force
-$receiptPartial = "$receipt.partial"
-# WriteAllText writes UTF-8 without a byte order mark on every PowerShell.
-[IO.File]::WriteAllText($receiptPartial, ([ordered]@{ app = 'utter'; artifact = 'desktop'; channel = $channel; method = 'direct'; root = $support } | ConvertTo-Json -Compress))
-Move-Item $receiptPartial $receipt -Force
-
-$shell = New-Object -ComObject WScript.Shell
-$link = $shell.CreateShortcut($shortcut)
-$link.TargetPath = $executable
-$link.Arguments = 'app'
-$link.Description = $managedMark
-$link.WorkingDirectory = $versionDir
-$link.Save()
-
-if ($consoleUrl) {
-    New-Item -ItemType Directory -Force $bin | Out-Null
-    $copy = Join-Path $bin 'utter.com.partial'
-    Copy-Item $console $copy -Force
-    Replace-File $copy (Join-Path $bin 'utter.com')
-    Set-BinOnPath $true
-}
+$version = (Get-Content (Join-Path $support 'current-version') -Raw).Trim()
+$executable = Join-Path $support "versions\$version\utter.exe"
+if (-not (Test-Path $executable)) { throw "The installer finished but $executable is missing." }
 
 Write-Output "Installed Utter $version."
-Write-Output "  Executable: $executable"
-Write-Output "  Start Menu: Utter"
-if ($consoleUrl) { Write-Output "  Terminal: utter (open a new terminal; $bin is on PATH)" }
-Write-Output 'Launch at login can be enabled inside Utter Settings.'
+Write-Output "  App:      Start menu > Utter"
+Write-Output "  Terminal: utter (open a new terminal first)"
+Write-Output "  Remove:   Settings > Apps, or install-windows.ps1 -Uninstall"
+# A silent install doesn't open the app, so open it here.
+Start-Process $executable -ArgumentList 'app' -WorkingDirectory (Split-Path $executable)

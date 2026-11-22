@@ -62,13 +62,14 @@ if [ "$arch" = aarch64 ]; then
   export CC=clang-cl CXX=clang-cl CMAKE_GENERATOR=Ninja
 fi
 # Cargo reads .cargo/config.toml (the static Windows runtime) from the
-# working directory, not from --manifest-path.
-(cd "$root" && TRANSCRIBE_CMAKE_ARGS="$cmake_args" cargo build --locked --release --target "$triple")
-(cd "$root" && cargo build --locked --release --target "$triple" -p utter-console)
+# working directory, not from --manifest-path. The dist profile is the release
+# build with whole-program link-time optimization (Cargo.toml), as the
+# Windows workflow ships it; one run builds both programs in parallel.
+(cd "$root" && TRANSCRIBE_CMAKE_ARGS="$cmake_args" cargo build --locked --profile dist --target "$triple" -p utter -p utter-console)
 executable="$dist/utter-$version-windows-$label.exe"
 console="$dist/utter-$version-windows-$label.com"
-cp "$target_dir/$triple/release/utter.exe" "$executable"
-cp "$target_dir/$triple/release/utter-console.exe" "$console"
+cp "$target_dir/$triple/dist/utter.exe" "$executable"
+cp "$target_dir/$triple/dist/utter-console.exe" "$console"
 test "$(head -c 2 "$executable")" = MZ
 test "$(head -c 2 "$console")" = MZ
 # An executable for the other architecture cannot run here; the installer

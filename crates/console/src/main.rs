@@ -33,7 +33,7 @@ fn main() {
     let utter = match std::env::current_exe().map(|path| locate(&path)) {
         Ok(Some(utter)) => utter,
         _ => {
-            eprintln!("utter: couldn't find utter.exe; reinstall Utter from utter.example");
+            eprintln!("utter: couldn't find utter.exe; reinstall Utter from https://github.com/Sudeepnt/Utter-Windows/releases");
             std::process::exit(1);
         }
     };

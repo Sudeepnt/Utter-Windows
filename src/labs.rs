@@ -45,7 +45,7 @@ pub use self::gates::*;
 pub use self::group::Group;
 
 /// Where people send feedback on Labs features.
-pub const FEEDBACK_URL: &str = "https://utter.example/source/issues/new";
+pub const FEEDBACK_URL: &str = "https://github.com/Sudeepnt/Utter-Windows/issues/new";
 
 /// Who a Labs feature is for.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

@@ -38,7 +38,7 @@ pub const AUTHENTICODE_SIGNER: &str = "Utter Innovations, Inc https://utter.exam
 /// `HKLM` (or `HKCU`) `\SOFTWARE\Policies\Utter\Utter`, value `DisableUpdates`.
 const POLICY_KEY: &str = r"SOFTWARE\Policies\Utter\Utter";
 /// The Apps & Features entry that packaging/windows/utter.iss registers.
-const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{6ED48C92-5177-41F4-B8D6-37B7B02CFDF4}_is1";
+const UNINSTALL_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\{167AB567-E9F8-4F9B-9F38-61C0C8A17F65}_is1";
 
 /// The activated `utter.exe`.
 #[derive(Clone, Debug)]

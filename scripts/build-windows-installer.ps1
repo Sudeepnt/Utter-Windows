@@ -1,4 +1,4 @@
-# Builds utter-setup-<version>-windows-<x64|arm64>.exe, the per-user Windows
+# Builds UtterSetup-<x64|arm64>.exe, the per-user Windows
 # installer, around an already-built (and signed) release utter.exe and its
 # console entry point utter.com. Installs Inno Setup 6 when ISCC is missing. The
 # installer embeds both byte for byte. -Console is left out only to wrap a
@@ -50,6 +50,6 @@ if (-not $iscc) {
 
 & $iscc /Qp "/DAppVersion=$Version" "/DArch=$label" "/DExecutable=$Executable" @consoleDefine "/DOutputDir=$OutDir" $script
 if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE." }
-$installer = Join-Path $OutDir "utter-setup-$Version-windows-$label.exe"
+$installer = Join-Path $OutDir "UtterSetup-$label.exe"
 if (-not (Test-Path $installer)) { throw "ISCC did not produce $installer." }
 Write-Output $installer
