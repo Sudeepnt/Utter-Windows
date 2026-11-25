@@ -1,14 +1,11 @@
-# Regenerates resources/windows/utter.ico, the executable, taskbar, and shortcut
-# icon: the macOS icon's glyph on a flat dark tile with a thin lighter rim, so
-# it reads on both dark and light taskbars. Windows icons are flat; the macOS
-# gradient collapses into a hard band at taskbar sizes.
+# Regenerates the Windows app icon from assets/icons/utter-logo.png.
 param([string]$Out)
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $Out) { $Out = Join-Path $root "resources\windows\utter.ico" }
-$glyph = [Drawing.Image]::FromFile((Join-Path $root "app\AppIcon.icon\Assets\Image.png"))
+$glyph = [Drawing.Image]::FromFile((Join-Path $root "assets\icons\utter-logo.png"))
 $sizes = 256, 64, 48, 40, 32, 24, 20, 16
 $frames = foreach ($size in $sizes) {
     $bitmap = New-Object Drawing.Bitmap $size, $size
@@ -16,24 +13,7 @@ $frames = foreach ($size in $sizes) {
     $graphics.SmoothingMode = "AntiAlias"
     $graphics.InterpolationMode = "HighQualityBicubic"
     $graphics.PixelOffsetMode = "HighQuality"
-    $inset = if ($size -le 24) { 0.5 } else { [Math]::Max(1, $size / 32) }
-    $tile = $size - 2 * $inset
-    $diameter = 2 * $tile * 0.22
-    $path = New-Object Drawing.Drawing2D.GraphicsPath
-    $path.AddArc($inset, $inset, $diameter, $diameter, 180, 90)
-    $path.AddArc($inset + $tile - $diameter, $inset, $diameter, $diameter, 270, 90)
-    $path.AddArc($inset + $tile - $diameter, $inset + $tile - $diameter, $diameter, $diameter, 0, 90)
-    $path.AddArc($inset, $inset + $tile - $diameter, $diameter, $diameter, 90, 90)
-    $path.CloseFigure()
-    $fill = New-Object Drawing.SolidBrush ([Drawing.Color]::FromArgb(255, 22, 22, 22))
-    $graphics.FillPath($fill, $path)
-    $rim = New-Object Drawing.Pen ([Drawing.Color]::FromArgb(255, 70, 70, 70)), ([Math]::Max(1, $size / 48))
-    $graphics.DrawPath($rim, $path)
-    # Small frames give the glyph more of the tile so its rings stay legible.
-    $share = if ($size -le 24) { 0.68 } elseif ($size -le 40) { 0.62 } else { 0.56 }
-    $height = $tile * $share * 1.12 * $glyph.Height / [Math]::Max($glyph.Width, $glyph.Height)
-    $width = $height * $glyph.Width / $glyph.Height
-    $graphics.DrawImage($glyph, ($size - $width) / 2, ($size - $height) / 2, $width, $height)
+    $graphics.DrawImage($glyph, 0, 0, $size, $size)
     $graphics.Dispose()
 
     $stream = New-Object IO.MemoryStream

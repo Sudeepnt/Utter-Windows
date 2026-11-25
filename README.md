@@ -41,6 +41,13 @@ Utter installs into `%APPDATA%\utter` and adds itself to the Start menu,
 Settings and history live in `%APPDATA%\utter`, speech models and logs in
 `%LOCALAPPDATA%\utter`; uninstalling keeps them.
 
+## In-app pricing preview
+
+Open **Pricing** in the sidebar for the US$0.50 monthly and US$50 lifetime plans.
+The plan buttons preview your selection inside the app. Checkout and licensing
+are not connected yet; previewing a plan does not collect a payment or activate
+a license. Plan content lives in `src/rune_ui/pricing.rs`.
+
 ## Command line
 
 `utter transcribe meeting.m4a` prints a recording's transcript. It reads WAV,
@@ -84,8 +91,8 @@ with `scripts/build-windows-installer.ps1` (it installs Inno Setup when needed).
 
 - Colours: edit the three values at the top of
   `crates/utter-theme/tools/brand.py` and run it.
-- Icons: edit `scripts/render-icons.swift`, run `swift scripts/render-icons.swift`
-  on a Mac, then `python3 scripts/pack-ico.py` to rebuild `resources/windows/utter.ico`.
+- Icons: replace `assets/icons/utter-logo.png`, then run `swift scripts/render-icons.swift`
+  on a Mac to regenerate the app icons, including `resources/windows/utter.ico`.
 - Fonts: `crates/utter-theme/assets/fonts` (Figtree and JetBrains Mono, SIL OFL).
 
 ## License

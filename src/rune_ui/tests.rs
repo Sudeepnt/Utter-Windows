@@ -302,7 +302,11 @@ fn each_panes_advanced_fold_starts_closed_and_stays_its_own() {
 #[test]
 fn desktops_without_a_portal_list_commands_instead_of_recording_rows() {
     let rt = runtime("commands", true, GOLDEN_SIZE);
-    assert!(texts(&rt).iter().any(|text| text == "utter dictation toggle"));
+    assert!(
+        texts(&rt)
+            .iter()
+            .any(|text| text == "utter dictation toggle")
+    );
     assert!(rt.find("dictation-hotkey").is_none());
     assert!(rt.find("paste-last-hotkey").is_none());
 }
@@ -3498,4 +3502,27 @@ fn output_fixes_show_only_with_their_lab_and_fix_this_copies_for_the_sentence() 
     );
     tap(&mut on, "output-vocabulary");
     assert!(on.state.vocabulary.open);
+}
+
+#[test]
+fn pricing_previews_both_plans_without_saving_or_charging() {
+    for scene in ["mac-settings", "windows-settings"] {
+        let mut rt = runtime(scene, true, TALL_SIZE);
+        tap(&mut rt, "nav-pricing");
+        assert_eq!(rt.state.pane, Pane::Pricing);
+        for (key, plan, price) in [
+            ("preview-monthly", pricing::Plan::Monthly, "US$0.50"),
+            ("preview-lifetime", pricing::Plan::Lifetime, "US$50"),
+        ] {
+            tap(&mut rt, key);
+            assert_eq!(rt.state.pricing_plan, Some(plan));
+            let shown = texts(&rt);
+            assert!(shown.iter().any(|line| line.contains(price)));
+            assert!(shown.iter().any(|line| line == "Purchase preview"));
+            tap(&mut rt, "close-preview");
+            assert_eq!(rt.state.pricing_plan, None);
+        }
+        assert!(sent(&rt).is_empty(), "previews send no service requests");
+        assert_eq!(saved(&rt), 0, "previews do not save a purchase or license");
+    }
 }

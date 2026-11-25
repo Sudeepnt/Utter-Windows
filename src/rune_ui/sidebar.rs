@@ -18,6 +18,11 @@ static OUTPUT_ICON: Icon = Icon {
     view: 24.0,
     body: include_str!("../../assets/icons/output.svg"),
 };
+static PRICING_ICON: Icon = Icon {
+    name: "utter-pricing",
+    view: 24.0,
+    body: r#"<rect x="3" y="5" width="18" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3 10h18M7 15h4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>"#,
+};
 static HISTORY_ICON: Icon = Icon {
     name: "utter-history",
     view: 24.0,
@@ -65,6 +70,8 @@ pub(super) enum Pane {
     /// Recorded calls and their settings, or the opt-in (macOS beta).
     Meetings,
     History,
+    /// Plans and purchase previews.
+    Pricing,
     /// The shots and recordings Labs › Screenshots saved (macOS, while
     /// it's on).
     #[cfg(utter_capture)]
@@ -91,6 +98,7 @@ impl Pane {
         Pane::Modes,
         Pane::Meetings,
         Pane::History,
+        Pane::Pricing,
         #[cfg(utter_capture)]
         Pane::Captures,
         #[cfg(utter_capture)]
@@ -122,6 +130,7 @@ impl Pane {
             Pane::Output => tr("Output"),
             Pane::Modes => tr("Modes"),
             Pane::History => tr("History"),
+            Pane::Pricing => tr("Pricing"),
             #[cfg(utter_capture)]
             Pane::Captures => tr("Captures"),
             Pane::Meetings => tr("Meetings"),
@@ -139,6 +148,7 @@ impl Pane {
             Pane::Output => "nav-output",
             Pane::Modes => "nav-modes",
             Pane::History => "nav-history",
+            Pane::Pricing => "nav-pricing",
             #[cfg(utter_capture)]
             Pane::Captures => "nav-captures",
             Pane::Meetings => "nav-meetings",
@@ -156,6 +166,7 @@ impl Pane {
             Pane::Output => &OUTPUT_ICON,
             Pane::Modes => &MODES_ICON,
             Pane::History => &HISTORY_ICON,
+            Pane::Pricing => &PRICING_ICON,
             #[cfg(utter_capture)]
             Pane::Captures => &captures::CAPTURES_ICON,
             Pane::Meetings => &MEETINGS_ICON,
@@ -353,8 +364,7 @@ fn footer(ui: &Ui, p: Paint) -> El {
         .gap(8.0)
         .center_y()
         .child(
-            onboarding_kit::utter_meter::utter_meter(p, "brand-mark", 18.0, 1.0, 1.0)
-                .a11y_hidden(),
+            onboarding_kit::utter_meter::utter_meter(p, "brand-mark", 18.0, 1.0, 1.0).a11y_hidden(),
         )
         .child(
             text("Utter")
@@ -573,14 +583,16 @@ fn nav_item(p: Paint, pane: Pane, on: bool) -> El {
         );
     if on {
         // Selected: an accent tint with a short accent bar on its leading edge.
-        item = item.fill(c.bg_accent.alpha(if p.k.dark { 0.22 } else { 0.10 })).child(
-            el().key("indicator")
-                .absolute(1.0, (NAV_ROW_HEIGHT - 14.0) / 2.0)
-                .size(3.0, 14.0)
-                .radius(1.5)
-                .fill(c.icon_accent)
-                .a11y_hidden(),
-        );
+        item = item
+            .fill(c.bg_accent.alpha(if p.k.dark { 0.22 } else { 0.10 }))
+            .child(
+                el().key("indicator")
+                    .absolute(1.0, (NAV_ROW_HEIGHT - 14.0) / 2.0)
+                    .size(3.0, 14.0)
+                    .radius(1.5)
+                    .fill(c.icon_accent)
+                    .a11y_hidden(),
+            );
     }
     lists::source_item(item, on)
 }

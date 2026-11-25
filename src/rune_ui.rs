@@ -54,6 +54,7 @@ mod platform;
 mod platform_settings;
 pub(crate) mod playground;
 mod practice;
+mod pricing;
 mod scenes;
 #[cfg(utter_capture)]
 mod scrawl;
@@ -643,6 +644,8 @@ pub(crate) struct Ui {
     /// The settings the host last reported, to adopt only its changes.
     service_settings: Option<AppSettings>,
     pane: Pane,
+    /// The plan whose in-app purchase preview is open; never a license.
+    pricing_plan: Option<pricing::Plan>,
     open: Option<Menu>,
     // General
     microphones: Result<crate::audio::InputDevices, String>,
@@ -789,6 +792,7 @@ impl Ui {
             connection_error: None,
             service_settings: None,
             pane: Pane::General,
+            pricing_plan: None,
             open: None,
             microphones: Ok(Default::default()),
             microphones_route: None,
@@ -1481,6 +1485,7 @@ fn view(ui: &Ui, cx: &mut Cx<Ui>) -> El {
         Pane::VoiceFilter => (Vec::new(), fun::pane(ui, p)),
         Pane::HudLab => hud_lab::pane(ui, p),
         Pane::Activity => activity::pane(ui, p),
+        Pane::Pricing => (Vec::new(), pricing::pane(ui, p)),
     };
     // The content sits on a soft raised card, rounder than the controls in it.
     let panel = col()

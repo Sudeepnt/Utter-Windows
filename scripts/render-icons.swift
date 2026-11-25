@@ -1,19 +1,12 @@
-// Draws Utter's mark and every icon file the app ships, from code.
-//
-//   swift scripts/render-icons.swift
-//
-// The mark is a rounded "u" holding a level bar: a lowercase u and a
-// microphone at once. Change BRAND_TOP / BRAND_BOTTOM to recolour the app
-// icon; the menu bar and tray icons are single-colour and follow the system.
+// Generates full-colour app icons from assets/icons/utter-logo.png.
+// Menu bar and tray symbols use a monochrome microphone mark.
+// Run with `swift scripts/render-icons.swift` from the repository root.
 
 import AppKit
 import CoreGraphics
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
-
-let BRAND_TOP = CGColor(srgbRed: 0.98, green: 0.57, blue: 0.24, alpha: 1)     // #fb923c
-let BRAND_BOTTOM = CGColor(srgbRed: 0.76, green: 0.25, blue: 0.05, alpha: 1)  // #c2410c
 
 let root = URL(fileURLWithPath: CommandLine.arguments.count > 1
     ? CommandLine.arguments[1]
@@ -84,23 +77,19 @@ func write(_ data: Data, _ path: String) {
     print("wrote \(path)")
 }
 
-/// The full-colour app icon: the mark in white on a brand gradient squircle.
+/// Use the checked-in brand artwork for every full-colour app icon.
 func appIcon(_ size: Int) -> CGContext {
     let ctx = canvas(size, size)
-    let s = CGFloat(size)
-    let inset = s * 0.06
-    let tile = CGRect(x: inset, y: inset, width: s - 2 * inset, height: s - 2 * inset)
-    let path = CGPath(roundedRect: tile, cornerWidth: tile.width * 0.225,
-                      cornerHeight: tile.width * 0.225, transform: nil)
-    ctx.addPath(path)
-    ctx.clip()
-    let gradient = CGGradient(colorsSpace: CGColorSpace(name: CGColorSpace.sRGB)!,
-                              colors: [BRAND_TOP, BRAND_BOTTOM] as CFArray, locations: [0, 1])!
-    ctx.drawLinearGradient(gradient, start: CGPoint(x: 0, y: tile.minY),
-                           end: CGPoint(x: 0, y: tile.maxY), options: [])
-    let m = tile.width * 0.56
-    drawMark(ctx, in: CGRect(x: tile.midX - m / 2, y: tile.midY - m / 2, width: m, height: m),
-             color: CGColor(gray: 1, alpha: 1))
+    let url = root.appendingPathComponent("assets/icons/utter-logo.png")
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+        fatalError("Missing brand artwork at \(url.path)")
+    }
+    ctx.saveGState()
+    ctx.translateBy(x: 0, y: CGFloat(size))
+    ctx.scaleBy(x: 1, y: -1)
+    ctx.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+    ctx.restoreGState()
     return ctx
 }
 
@@ -126,9 +115,8 @@ func straightRGBA(_ ctx: CGContext) -> Data {
     return out
 }
 
-// macOS: the app icon layer (white mark, Icon Composer adds the fill) and the
-// menu bar template images.
-write(pngData(markOnly(1600, color: CGColor(gray: 1, alpha: 1), pad: 0)), "app/AppIcon.icon/Assets/Image.png")
+// macOS app artwork and menu bar template images.
+write(pngData(appIcon(1024)), "app/AppIcon.icon/Assets/Image.png")
 write(pngData(markOnly(36, color: CGColor(gray: 0, alpha: 1), pad: 0.1)), "assets/icons/menubar-idle@2x.png")
 write(pngData(markOnly(36, color: CGColor(gray: 0, alpha: 1), dot: true, pad: 0.1)), "assets/icons/menubar-recording@2x.png")
 
@@ -145,3 +133,19 @@ for size in [16, 24, 32, 48, 64, 128, 256] {
 for size in [16, 24, 32, 48, 64, 128, 256, 512] {
     write(pngData(appIcon(size)), "packaging/linux/icons/hicolor/\(size)x\(size)/apps/app.utter.png")
 }
+
+// Windows accepts PNG-compressed ICO frames on supported Windows versions.
+let sizes = [16, 24, 32, 48, 64, 128, 256]
+let frames = sizes.map { pngData(appIcon($0)) }
+var ico = Data()
+func word(_ value: UInt16) { var v = value.littleEndian; withUnsafeBytes(of: &v) { ico.append(contentsOf: $0) } }
+func dword(_ value: UInt32) { var v = value.littleEndian; withUnsafeBytes(of: &v) { ico.append(contentsOf: $0) } }
+word(0); word(1); word(UInt16(sizes.count))
+var offset = UInt32(6 + 16 * sizes.count)
+for (size, frame) in zip(sizes, frames) {
+    ico.append(contentsOf: [UInt8(size % 256), UInt8(size % 256), 0, 0])
+    word(1); word(32); dword(UInt32(frame.count)); dword(offset)
+    offset += UInt32(frame.count)
+}
+for frame in frames { ico.append(frame) }
+write(ico, "resources/windows/utter.ico")

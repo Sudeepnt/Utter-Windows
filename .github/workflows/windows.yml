@@ -45,6 +45,8 @@ jobs:
       # Portable CPU kernels: without this, ggml tunes to the build machine's
       # CPU and the app can crash on older PCs.
       TRANSCRIBE_CMAKE_ARGS: -DGGML_NATIVE=OFF
+      # Preview installers must not contact an unconfigured update service.
+      UTTER_LOCAL_BUILD: '1'
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:

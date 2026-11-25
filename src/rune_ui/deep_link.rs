@@ -43,10 +43,11 @@ impl LabsLink {
 }
 
 /// The main panes a `utter://settings/<pane>` link names.
-const PANES: [(&str, Pane); 5] = [
+const PANES: [(&str, Pane); 6] = [
     ("general", Pane::General),
     ("output", Pane::Output),
     ("history", Pane::History),
+    ("pricing", Pane::Pricing),
     ("meetings", Pane::Meetings),
     ("voice-filter", Pane::VoiceFilter),
 ];

@@ -48,6 +48,7 @@ pub(super) fn main_panes(ui: &Ui) -> Vec<Pane> {
     #[cfg(not(utter_capture))]
     let optional = [Pane::Meetings, Pane::VoiceFilter];
     panes.extend(optional.into_iter().filter(|pane| pane.shown(ui)));
+    panes.push(Pane::Pricing);
     panes
 }
 
