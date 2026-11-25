@@ -43,10 +43,8 @@ Settings and history live in `%APPDATA%\utter`, speech models and logs in
 
 ## In-app pricing preview
 
-Open **Pricing** in the sidebar for the US$0.50 monthly and US$50 lifetime plans.
-The plan buttons preview your selection inside the app. Checkout and licensing
-are not connected yet; previewing a plan does not collect a payment or activate
-a license. Plan content lives in `src/rune_ui/pricing.rs`.
+Open **Pricing** in the sidebar. Utter is **Free right now** and requires no
+purchase or paid license. Checkout is not active. Plan content lives in `src/rune_ui/pricing.rs`.
 
 ## Command line
 
@@ -98,3 +96,26 @@ with `scripts/build-windows-installer.ps1` (it installs Inno Setup when needed).
 ## License
 
 MIT. See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+
+## Publishing updates
+
+Packaged builds with `UTTER_GITHUB_UPDATES=1` check the public releases in
+`Sudeepnt/Utter` ten seconds after startup, then every fifteen minutes. The
+running version is compared numerically with the published desktop version;
+older or identical versions are never offered as updates. Beta builds also see
+published previews. Drafts, other platforms, unrelated URLs, and releases without
+checksums are ignored.
+
+When a newer installer exists, **Download update** stays in the sidebar and a
+reminder returns ten minutes after dismissal. Clicking downloads the installer;
+the user runs it and reopens Utter to complete the update. Unsigned previews do
+not silently execute or replace an installed app. Existing signature requirements
+for any future automatic self-replacement remain enforced.
+
+For the next update, increment `Cargo.toml` and its root `Cargo.lock` entry in
+both app repositories, build and verify installers, and publish a higher-version
+release with installer assets and `SHA256SUMS.txt` to `Sudeepnt/Utter`. A code push
+alone is not an installer release. Stable Mac distribution still requires a
+Developer ID certificate and Apple notarization; publish unsigned test builds
+only as clearly labelled previews.

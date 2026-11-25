@@ -124,3 +124,91 @@ fn list(p: Paint, notes: &crate::desktop::host::UpdateNotes) -> Option<El> {
             .children(items),
     )
 }
+
+/// A persistent update keeps its sidebar action and returns this reminder
+/// ten minutes after dismissal, until the newer app is installed and launched.
+#[derive(Default)]
+pub(super) struct Reminder {
+    pub(super) open: bool,
+    due: f64,
+    now: f64,
+}
+impl Reminder {
+    fn tick(&mut self, available: bool, now: f64) -> bool {
+        self.now = now;
+        if !available {
+            let changed = self.open;
+            self.open = false;
+            self.due = 0.0;
+            return changed;
+        }
+        if !self.open && now >= self.due {
+            self.open = true;
+            return true;
+        }
+        false
+    }
+    pub(super) fn snooze(&mut self) {
+        self.open = false;
+        self.due = self.now + 600.0;
+    }
+}
+pub(super) fn poll(ui: &mut Ui, clock: f64) -> bool {
+    let available = ui.view.as_ref().is_some_and(|view| {
+        matches!(
+            view.update_status,
+            DesktopUpdateStatus::Available | DesktopUpdateStatus::ReadyToRestart
+        )
+    });
+    ui.update_reminder.tick(available, clock)
+}
+pub(super) fn modal(ui: &Ui, p: Paint) -> Option<[El; 2]> {
+    if !ui.update_reminder.open || ui.tour.is_some() {
+        return None;
+    }
+    let restart = ui
+        .view
+        .as_ref()
+        .is_some_and(|view| view.update_status == DesktopUpdateStatus::ReadyToRestart);
+    let panel=col().key("update-reminder").role("dialog").label(tr("Update Utter"))
+        .w(430.0).padding(24.0).gap(18.0).radius(p.k.radius.xl).fill(p.k.c.bg_base).border(p.hair,p.k.c.border_weak)
+        .on_press(|_: &mut Ui| {})
+        .child(text(tr("A new Utter update is available")).key("title").font(p.k.ty.body_medium).color(p.text()).wrap())
+        .child(text(if restart {tr("Restart Utter to finish installing the update.")} else {tr("Download the new version, run its installer, and reopen Utter to finish updating.")}).key("description").font(p.k.ty.ui).color(p.muted()).wrap())
+        .child(row().key("actions").gap(12.0)
+            .child(controls::button(p,"remind-update",tr("Remind me in 10 minutes"),controls::ButtonKind::Secondary,|ui,_| ui.update_reminder.snooze()))
+            .child(controls::button(p,"download-update-now",if restart {tr("Restart to update")} else {tr("Download update")},controls::ButtonKind::Primary,move |ui,_| {
+                ui.send(Request::Desktop(if restart {DesktopAction::RestartIntoUpdate} else {DesktopAction::OpenUpdate}));
+                ui.update_reminder.snooze();
+            }).default_button()));
+    let layer = |key| {
+        el().key(key)
+            .role("none")
+            .absolute(0.0, 0.0)
+            .w_full()
+            .h_full()
+    };
+    Some([
+        layer("update-reminder-scrim")
+            .fill(p.k.c.scrim)
+            .on_press(|ui: &mut Ui| ui.update_reminder.snooze()),
+        layer("update-reminder-layer")
+            .center()
+            .child(panel.modal(true, |ui: &mut Ui| ui.update_reminder.snooze())),
+    ])
+}
+#[cfg(test)]
+mod reminder_tests {
+    use super::*;
+    #[test]
+    fn reminders_return_until_the_update_is_installed() {
+        let mut r = Reminder::default();
+        assert!(r.tick(true, 10.0));
+        assert!(r.open);
+        r.snooze();
+        assert!(!r.tick(true, 609.0));
+        assert!(r.tick(true, 610.0));
+        r.tick(false, 611.0);
+        assert!(!r.open);
+    }
+}

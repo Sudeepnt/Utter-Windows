@@ -174,6 +174,7 @@ fn build_version() {
 /// A test or local build carries its commit (`UTTER_COMMIT`), which the sidebar shows
 /// beside the version.
 fn test_build_commit() {
+    println!("cargo:rerun-if-env-changed=UTTER_GITHUB_UPDATES");
     println!("cargo:rerun-if-env-changed=UTTER_BUILD_CHANNEL");
     println!("cargo:rerun-if-env-changed=UTTER_TEST_BUILD");
     println!("cargo:rerun-if-env-changed=UTTER_LOCAL_BUILD");

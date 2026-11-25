@@ -1,19 +1,10 @@
-//! Utter's in-app updater on every OS, a client of the Utter release service
-//! (`docs/plans/release-service.md`). One worker polls the channel's manifest
-//! 10 seconds after launch, then hourly or on "Check for updates", decides with the
-//! protocol's client rules, and for a direct install downloads the target,
-//! checks its size, SHA-256, and OS code signature, and stages it until the
-//! user restarts. Checks continue while an update is staged, so a newer
-//! release replaces it, and Restart to update checks once more before it
-//! switches over. Versions are display text and never compared: whenever the
-//! channel's current release is not the running build (its target SHA-256,
-//! else its exact version), Utter takes it, and switching channels does so
-//! after the user confirms. Package-managed installs only learn the command to run;
-//! source builds, test builds, and installs whose administrator set
-//! `DisableUpdates` never check. Manifests are not signed: HTTPS, the
-//! manifest's SHA-256, and (macOS, Windows) the code signature are the
-//! integrity checks.
+//! Packaged desktop apps check the public Sudeepnt/Utter GitHub Releases.
+//! Newer installers are offered as explicit downloads and never executed
+//! automatically. A persistent UI reminder continues until the new app runs.
+//! The older signed self-replacement implementation remains below for future
+//! use; its platform code-signature checks are not bypassed for previews.
 
+mod github;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 pub mod legacy;
 pub(crate) mod notes;
@@ -253,15 +244,14 @@ pub struct Updater {
 impl Updater {
     pub fn start() -> Self {
         let method = platform::method();
-        // This app never contacts an update server: new versions ship as new
-        // builds. The checks below stay so the updater's states still compile.
-        let never_check = true;
+        // Only explicitly configured packages use the public GitHub feed.
+        let never_check = !github::enabled();
         let disabled = if never_check
             || option_env!("UTTER_TEST_BUILD") == Some("1")
             || updates_off_by_env()
         {
             Some(DesktopUpdateStatus::Unavailable)
-        } else if crate::app_paths::is_local_build() {
+        } else if crate::app_paths::is_local_build() && !github::enabled() {
             Some(DesktopUpdateStatus::SourceBuild)
         } else if managed_by_policy() {
             Some(DesktopUpdateStatus::Managed)
@@ -278,14 +268,14 @@ impl Updater {
             },
             matches!(method, Method::Package(_)),
         ));
-        if method == Method::Unknown {
+        if method == Method::Unknown && !github::enabled() {
             *lock(&shared.blocked) = platform::blocked();
         }
         if checks {
             let worker = shared.clone();
             if let Err(error) = std::thread::Builder::new()
                 .name("updater".into())
-                .spawn(move || run(&worker, &method))
+                .spawn(move || github::run(&worker))
             {
                 tracing::error!(%error, "could not start the updater");
                 *lock(&shared.state) = State::Failed;
@@ -320,7 +310,7 @@ impl Updater {
         let mut state = lock(&self.shared.state);
         match &*state {
             State::Disabled(_) | State::Applied | State::Downloading => return,
-            State::Ready => {}
+            State::Ready | State::Download { .. } => {}
             _ => *state = State::Checking,
         }
         drop(state);
@@ -337,7 +327,9 @@ impl Updater {
     pub fn window_focused(&self) {
         let recent = lock(&self.shared.last)
             .as_ref()
-            .is_some_and(|(channel, at)| channel != "dev" || at.elapsed() < FOCUS_CHECK_GAP);
+            .is_some_and(|(channel, at)| {
+                (!github::enabled() && channel != "dev") || at.elapsed() < FOCUS_CHECK_GAP
+            });
         if !recent {
             self.check_now();
         }
@@ -898,7 +890,8 @@ mod tests {
     use super::*;
 
     fn temporary(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("utter-updater-{name}-{}", std::process::id()));
+        let path =
+            std::env::temp_dir().join(format!("utter-updater-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&path);
         std::fs::create_dir_all(&path).unwrap();
         path

@@ -644,8 +644,7 @@ pub(crate) struct Ui {
     /// The settings the host last reported, to adopt only its changes.
     service_settings: Option<AppSettings>,
     pane: Pane,
-    /// The plan whose in-app purchase preview is open; never a license.
-    pricing_plan: Option<pricing::Plan>,
+    update_reminder: sidebar_update::Reminder,
     open: Option<Menu>,
     // General
     microphones: Result<crate::audio::InputDevices, String>,
@@ -792,7 +791,7 @@ impl Ui {
             connection_error: None,
             service_settings: None,
             pane: Pane::General,
-            pricing_plan: None,
+            update_reminder: sidebar_update::Reminder::default(),
             open: None,
             microphones: Ok(Default::default()),
             microphones_route: None,
@@ -1166,6 +1165,9 @@ impl Ui {
 
     /// Closes the dialogs and sheets a pane switch or window close ends.
     fn close_dialogs(&mut self) {
+        if self.update_reminder.open {
+            self.update_reminder.snooze();
+        }
         picker::close(self);
         explainer::close(self);
         sound_sets::close(self);
@@ -1332,6 +1334,7 @@ fn poll(ui: &mut Ui, clock: f64, tx: &mut Tx) -> bool {
     }
     let now = Instant::now();
     let mut changed = ui.save_drafts(now);
+    changed |= sidebar_update::poll(ui, clock);
     changed |= paste_access::poll(ui);
     // The OpenCode catalog is read only while a pane that uses it shows:
     // Modes, or Meetings › Settings while OpenCode writes the summaries.
@@ -1539,6 +1542,9 @@ fn view(ui: &Ui, cx: &mut Cx<Ui>) -> El {
         layer.extend(modal);
     }
     if let Some(modal) = vocabulary::modal(ui, p) {
+        layer.extend(modal);
+    }
+    if let Some(modal) = sidebar_update::modal(ui, p) {
         layer.extend(modal);
     }
     if let Some(first_run) = onboarding_kit::live::overlay(ui, p, cx.is_reduced_motion()) {

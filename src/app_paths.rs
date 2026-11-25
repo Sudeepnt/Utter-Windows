@@ -21,11 +21,7 @@ pub fn is_macos_test_build() -> bool {
 /// The name menus show, so a test build running beside Utter reads as itself.
 #[cfg(target_os = "macos")]
 pub fn app_name() -> &'static str {
-    if is_macos_test_build() {
-        "Utter Test"
-    } else {
-        "Utter"
-    }
+    "Utter"
 }
 
 pub fn support_dir() -> Result<PathBuf> {

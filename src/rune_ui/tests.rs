@@ -3505,24 +3505,15 @@ fn output_fixes_show_only_with_their_lab_and_fix_this_copies_for_the_sentence() 
 }
 
 #[test]
-fn pricing_previews_both_plans_without_saving_or_charging() {
+fn pricing_says_the_app_is_free_without_purchase_actions() {
     for scene in ["mac-settings", "windows-settings"] {
         let mut rt = runtime(scene, true, TALL_SIZE);
         tap(&mut rt, "nav-pricing");
         assert_eq!(rt.state.pane, Pane::Pricing);
-        for (key, plan, price) in [
-            ("preview-monthly", pricing::Plan::Monthly, "US$0.50"),
-            ("preview-lifetime", pricing::Plan::Lifetime, "US$50"),
-        ] {
-            tap(&mut rt, key);
-            assert_eq!(rt.state.pricing_plan, Some(plan));
-            let shown = texts(&rt);
-            assert!(shown.iter().any(|line| line.contains(price)));
-            assert!(shown.iter().any(|line| line == "Purchase preview"));
-            tap(&mut rt, "close-preview");
-            assert_eq!(rt.state.pricing_plan, None);
-        }
-        assert!(sent(&rt).is_empty(), "previews send no service requests");
-        assert_eq!(saved(&rt), 0, "previews do not save a purchase or license");
+        let shown = texts(&rt);
+        assert!(shown.iter().any(|line| line == "Free right now"));
+        assert!(rt.find("preview-monthly").is_none());
+        assert!(sent(&rt).is_empty());
+        assert_eq!(saved(&rt), 0);
     }
 }
