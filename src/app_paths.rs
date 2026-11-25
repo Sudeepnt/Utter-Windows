@@ -7,7 +7,8 @@ use color_eyre::eyre::{Result, eyre};
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 
 /// Whether this is a local build (`UTTER_LOCAL_BUILD=1`): made from a checkout
-/// for its owner's own machine, so it never checks for or offers updates.
+/// for its owner's machine. It checks releases only when explicitly packaged
+/// with UTTER_GITHUB_UPDATES=1.
 pub fn is_local_build() -> bool {
     option_env!("UTTER_LOCAL_BUILD") == Some("1")
 }

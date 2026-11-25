@@ -169,7 +169,7 @@ mod tests {
             size: 100,
         };
         Release {
-            tag_name: tag,
+            tag_name: tag.clone(),
             draft: false,
             prerelease: false,
             assets: vec![
